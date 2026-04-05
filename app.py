@@ -308,8 +308,7 @@ if "pending" not in st.session_state:
 
 # ── HTML helpers ──────────────────────────────────────────────────────────────
 def _h(text: str) -> None:
-    """Section header label."""
-    st.markdown(f'<p class="sec-label">{text}</p>', unsafe_allow_html=True)
+    st.html(f'<p class="sec-label">{text}</p>')
 
 
 def _badge(text: str, color: str = "#3b82f6") -> str:
@@ -353,7 +352,7 @@ def render_header() -> None:
             '</span>'
         )
 
-    st.markdown(f"""
+    st.html(f"""
     <div style="padding:2.5rem 0 1.8rem;border-bottom:1px solid #0c1428;margin-bottom:2.2rem;">
       <div style="display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:12px;">
         <div>
@@ -364,16 +363,16 @@ def render_header() -> None:
             Reservation Monitor
           </h1>
           <p style="margin:0;color:#1e3a60;font-size:0.8rem;">
-            Resy &amp; OpenTable &nbsp;·&nbsp; SMS alerts
+            Resy &amp; OpenTable &nbsp;&middot;&nbsp; SMS alerts
           </p>
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
           {status_dot}
-          {'<span style="color:#122040;font-size:0.7rem;">' + last_str + '</span>' if last_str else ''}
+          {'<span style="color:#1e3a60;font-size:0.7rem;">' + last_str + '</span>' if last_str else ''}
         </div>
       </div>
     </div>
-    """, unsafe_allow_html=True)
+    """)
 
 
 # ── Monitoring active view ────────────────────────────────────────────────────
@@ -392,37 +391,32 @@ def render_active_status() -> None:
     last = last_check.strftime("%-I:%M:%S %p") if last_check else "checking…"
 
     # Green status banner
-    st.markdown(
+    st.html(
         f'<div style="background:linear-gradient(135deg,#071a14,#06131e);'
         f'border:1px solid #0d3028;border-radius:14px;padding:1rem 1.2rem;margin-bottom:1rem;">'
-        f'<div style="display:flex;justify-content:space-between;align-items:center;">'
-        f'<div>'
         f'<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;">'
         f'<span style="width:9px;height:9px;background:#4ade80;border-radius:50%;'
-        f'box-shadow:0 0 8px #4ade80cc;"></span>'
+        f'box-shadow:0 0 8px #4ade80cc;flex-shrink:0;"></span>'
         f'<span style="color:#4ade80;font-weight:700;font-size:0.95rem;">Monitoring Active</span>'
         f'</div>'
-        f'<span style="color:#1a5c40;font-size:0.78rem;">'
-        f'Watching {n} restaurant{"s" if n!=1 else ""} &nbsp;·&nbsp; last checked {last}'
+        f'<span style="color:#1a5c40;font-size:0.78rem;margin-left:17px;">'
+        f'Watching {n} restaurant{"s" if n!=1 else ""} &nbsp;&middot;&nbsp; last checked {last}'
         f'</span>'
         f'</div>'
-        f'</div></div>',
-        unsafe_allow_html=True,
     )
 
     # Found banners
     for rid, info in list(found.items()):
         r, slots = info["restaurant"], info["slots"]
-        st.markdown(
+        st.html(
             f'<div style="background:linear-gradient(135deg,#04150e,#051218);'
             f'border:1px solid #0d3028;border-radius:12px;padding:0.9rem 1.1rem;margin-bottom:0.5rem;">'
             f'<div style="font-size:1rem;font-weight:700;color:#4ade80;margin-bottom:3px;">🎉 Reservation Found!</div>'
             f'<div style="color:#6ee7b7;font-size:0.85rem;margin-bottom:3px;">'
-            f'{r["name"]} · {", ".join(slots)} · {r["date"]} · party of {r["party_size"]}'
+            f'{r["name"]} &middot; {", ".join(slots)} &middot; {r["date"]} &middot; party of {r["party_size"]}'
             f'</div>'
             f'<div style="color:#1a5030;font-size:0.75rem;">SMS sent. Keep watching?</div>'
-            f'</div>',
-            unsafe_allow_html=True,
+            f'</div>'
         )
         c1, c2, _ = st.columns([2, 2, 4])
         with c1:
@@ -445,7 +439,7 @@ def render_active_status() -> None:
             pc       = "#3b82f6" if r["platform"] == "resy" else "#22d3ee"
             with cols[i % len(cols)]:
                 with st.container(border=True):
-                    st.markdown(
+                    st.html(
                         f'<div style="display:flex;justify-content:space-between;align-items:flex-start;">'
                         f'<span style="color:#c8d8f0;font-weight:600;font-size:0.87rem;margin-bottom:4px;">'
                         f'{r["name"]}</span>'
@@ -455,9 +449,8 @@ def render_active_status() -> None:
                         f'{_badge(r["platform"], pc)}'
                         f'</div>'
                         f'<div style="color:#1a2e50;font-size:0.72rem;line-height:1.7;">'
-                        f'{r["date"]} · {r["earliest"]}–{r["latest"]} · party {r["party_size"]}'
-                        f'</div>',
-                        unsafe_allow_html=True,
+                        f'{r["date"]} &middot; {r["earliest"]}&#8211;{r["latest"]} &middot; party {r["party_size"]}'
+                        f'</div>'
                     )
                     if st.button("Remove", key=f"stop_{r['id']}"):
                         _remove(r["id"], r["name"])
@@ -492,12 +485,11 @@ def render_log() -> None:
                 f'<span style="color:{mc};font-size:0.76rem;">{e["msg"]}</span>'
                 f'</div>'
             )
-        st.markdown(
+        st.html(
             '<div style="background:#040810;border-radius:8px;padding:0.6rem 0.8rem;'
             'max-height:300px;overflow-y:auto;font-family:monospace;">'
             + "".join(rows)
-            + '</div>',
-            unsafe_allow_html=True,
+            + '</div>'
         )
 
 
@@ -506,7 +498,7 @@ def render_form() -> None:
     g    = st.session_state.form_gen   # form generation — bump to reset widgets
     active = _ms["active"]
 
-    st.markdown("<hr>", unsafe_allow_html=True)
+    st.html("<hr style='border-color:#0c1428;margin:1.6rem 0;'>")
     _h("Restaurant")
 
     platform = st.selectbox(
@@ -519,10 +511,9 @@ def render_form() -> None:
     resolved_name = ""
 
     if platform == "resy":
-        st.markdown(
+        st.html(
             '<p style="color:#1a3458;font-size:0.76rem;margin:0.15rem 0 0.45rem;">'
-            'Paste the Resy URL from your browser for the restaurant you want to monitor.</p>',
-            unsafe_allow_html=True,
+            'Paste the Resy URL from your browser for the restaurant you want to monitor.</p>'
         )
         resy_url = st.text_input(
             "Resy URL",
@@ -536,7 +527,7 @@ def render_form() -> None:
                 venue_id      = info["venue_id"]
                 resolved_name = info["name"]
                 meta = " · ".join(filter(None, [info.get("neighborhood", ""), info.get("cuisine", "")]))
-                st.markdown(
+                st.html(
                     f'<div style="background:linear-gradient(135deg,#070d20,#060e1c);'
                     f'border:1px solid #0f2040;border-radius:10px;'
                     f'padding:0.7rem 1rem;margin:0.3rem 0 0.6rem;">'
@@ -547,16 +538,14 @@ def render_form() -> None:
                     f'ID&nbsp;{venue_id}</span>'
                     f'</div>'
                     f'<span style="color:#1a3458;font-size:0.74rem;">{meta}</span>'
-                    f'</div>',
-                    unsafe_allow_html=True,
+                    f'</div>'
                 )
             else:
                 st.warning("Couldn't resolve that URL — check it's a valid Resy restaurant page.")
     else:
-        st.markdown(
+        st.html(
             '<p style="color:#1a3458;font-size:0.76rem;margin:0.15rem 0 0.45rem;">'
-            'Paste the OpenTable URL from your browser for the restaurant you want to monitor.</p>',
-            unsafe_allow_html=True,
+            'Paste the OpenTable URL from your browser for the restaurant you want to monitor.</p>'
         )
         ot_url = st.text_input(
             "OpenTable URL",
@@ -568,7 +557,7 @@ def render_form() -> None:
             if info:
                 venue_id      = info["rid"]
                 resolved_name = info["name"]
-                st.markdown(
+                st.html(
                     f'<div style="background:linear-gradient(135deg,#060d1c,#060b18);'
                     f'border:1px solid #0f2040;border-radius:10px;'
                     f'padding:0.7rem 1rem;margin:0.3rem 0 0.6rem;">'
@@ -578,13 +567,12 @@ def render_form() -> None:
                     f'border-radius:999px;font-size:0.7rem;font-weight:700;">'
                     f'OpenTable rid&nbsp;{venue_id}</span>'
                     f'</div>'
-                    f'</div>',
-                    unsafe_allow_html=True,
+                    f'</div>'
                 )
             else:
                 st.warning("Couldn't find a rid in that URL — make sure it contains ?rid=XXXXX.")
 
-    st.markdown("<div style='height:0.3rem'></div>", unsafe_allow_html=True)
+    st.html("<div style='height:0.3rem'></div>")
     _h("Reservation Details")
 
     res_date = st.date_input(
@@ -608,29 +596,28 @@ def render_form() -> None:
     # ── Pending list ──────────────────────────────────────────────────────────
     pending = st.session_state.pending
     if pending:
-        st.markdown("<div style='height:0.4rem'></div>", unsafe_allow_html=True)
+        st.html("<div style='height:0.4rem'></div>")
         _h(f"Queued  ({len(pending)})")
         for r in list(pending):
             color = "#3b82f6" if r["platform"] == "resy" else "#22d3ee"
             ci, cb = st.columns([10, 1])
             with ci:
-                st.markdown(
+                st.html(
                     f'<div style="padding:0.4rem 0;border-bottom:1px solid #090f1e;">'
                     f'<div style="display:flex;align-items:center;gap:7px;margin-bottom:2px;">'
                     f'<span style="color:#c8d8f0;font-weight:600;font-size:0.86rem;">{r["name"]}</span>'
                     f'{_badge(r["platform"], color)}'
                     f'</div>'
                     f'<span style="color:#162040;font-size:0.73rem;">'
-                    f'{r["date"]} · {r["earliest"]}–{r["latest"]} · party&nbsp;{r["party_size"]}'
-                    f'</span></div>',
-                    unsafe_allow_html=True,
+                    f'{r["date"]} &middot; {r["earliest"]}&#8211;{r["latest"]} &middot; party&nbsp;{r["party_size"]}'
+                    f'</span></div>'
                 )
             with cb:
                 if st.button("✕", key=f"rm_{r['id']}"):
                     st.session_state.pending = [x for x in pending if x["id"] != r["id"]]
                     st.rerun()
 
-    st.markdown("<div style='height:0.3rem'></div>", unsafe_allow_html=True)
+    st.html("<div style='height:0.3rem'></div>")
 
     # ── "Add Another" button ──────────────────────────────────────────────────
     def _build_entry():
@@ -666,7 +653,7 @@ def render_form() -> None:
             st.rerun()
 
     # ── Settings + Start ─────────────────────────────────────────────────────
-    st.markdown("<hr>", unsafe_allow_html=True)
+    st.html("<hr style='border-color:#0c1428;margin:1.6rem 0;'>")
     _h("Settings")
 
     phone = st.text_input(
@@ -689,7 +676,7 @@ def render_form() -> None:
             key="s_stop",
         )
 
-    st.markdown("<div style='height:0.4rem'></div>", unsafe_allow_html=True)
+    st.html("<div style='height:0.4rem'></div>")
 
     if not active:
         # Green gradient Start button via JS injection
