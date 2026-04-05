@@ -439,7 +439,7 @@ def render_add_form() -> None:
             )
 
         elif search_clicked and not results:
-            st.warning(f"No results found on {platform.title()} for "{query}". Try a different name or platform.")
+            st.warning(f'No results found on {platform.title()} for "{query}". Try a different spelling or switch platforms.')
 
         # ── Step 3: reservation details (shown once a venue is selected) ──────
         venue = st.session_state.selected_venue
