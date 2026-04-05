@@ -60,6 +60,100 @@ def _setup_file_logging(session_start: datetime) -> Path:
 # for read-only availability queries.
 _RESY_API_KEY = "VbWk7s3L4KiK5fzlO7JD3Q5EYolJI7n5"
 
+
+# ── Venue search ──────────────────────────────────────────────────────────────
+
+def search_resy(query: str) -> list:
+    """
+    Search Resy for venues in NYC matching query.
+    Returns a list of dicts: {name, venue_id, neighborhood, cuisine}.
+    """
+    try:
+        resp = requests.get(
+            "https://api.resy.com/3/venue/find",
+            headers={
+                "Authorization": f'ResyAPI api_key="{_RESY_API_KEY}"',
+                "X-Origin":      "https://resy.com",
+                "Referer":       "https://resy.com/",
+                "User-Agent":    (
+                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+                ),
+            },
+            params={
+                "query":      query,
+                "geo[city]":  "New York",
+                "geo[lat]":   40.7128,
+                "geo[long]":  -74.0060,
+                "geo[radius]": 0.5,
+            },
+            timeout=10,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+    except Exception as exc:
+        log.warning("Resy search error: %s", exc)
+        return []
+
+    results = []
+    for item in data.get("search", {}).get("venues", [])[:8]:
+        info  = item.get("venue", {})
+        vid   = info.get("id", {}).get("resy")
+        if not vid:
+            continue
+        results.append({
+            "name":         info.get("name", ""),
+            "venue_id":     vid,
+            "neighborhood": info.get("location", {}).get("neighborhood", ""),
+            "cuisine":      ", ".join(info.get("type", [])),
+        })
+    return results
+
+
+def search_opentable(query: str) -> list:
+    """
+    Search OpenTable for restaurants in NYC matching query.
+    Returns a list of dicts: {name, rid, neighborhood, cuisine}.
+    """
+    try:
+        resp = requests.get(
+            "https://mobile-api.opentable.com/api/v2/restaurant/search",
+            headers={
+                "User-Agent": (
+                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+                ),
+                "Accept": "application/json",
+            },
+            params={
+                "term":      query,
+                "latitude":  40.7128,
+                "longitude": -74.0060,
+                "radius":    10,
+                "pageSize":  8,
+                "covers":    2,
+            },
+            timeout=10,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+    except Exception as exc:
+        log.warning("OpenTable search error: %s", exc)
+        return []
+
+    results = []
+    for r in data.get("restaurants", [])[:8]:
+        rid = r.get("rid") or r.get("id")
+        if not rid:
+            continue
+        results.append({
+            "name":         r.get("name", ""),
+            "rid":          int(rid),
+            "neighborhood": r.get("neighborhood", r.get("city", "")),
+            "cuisine":      r.get("cuisine_type", r.get("cuisineType", "")),
+        })
+    return results
+
 _RESY_HEADERS = {
     "Authorization": f'ResyAPI api_key="{_RESY_API_KEY}"',
     "X-Origin":      "https://resy.com",

@@ -19,7 +19,7 @@ import streamlit.components.v1 as _components
 
 # ── project imports ───────────────────────────────────────────────────────────
 sys.path.insert(0, str(Path(__file__).parent))
-from monitor import check_resy, check_opentable
+from monitor import check_resy, check_opentable, search_resy, search_opentable
 
 # On Streamlit Cloud, credentials live in the secrets dashboard.
 # Locally, they live in config.py (gitignored).
@@ -290,8 +290,11 @@ def _remove(rid: int, name: str) -> None:
 
 # ── Session state init ────────────────────────────────────────────────────────
 if "queue" not in st.session_state:
-    st.session_state.queue   = []
-    st.session_state.next_id = 1
+    st.session_state.queue        = []
+    st.session_state.next_id      = 1
+    st.session_state.search_results  = []   # [{name, venue_id/rid, neighborhood, cuisine}, ...]
+    st.session_state.search_platform = ""   # platform the last search was run against
+    st.session_state.selected_venue  = None # the confirmed venue dict
 
 
 # ── UI helpers ────────────────────────────────────────────────────────────────
@@ -363,62 +366,116 @@ def render_add_form() -> None:
     with st.container(border=True):
         _label("＋  Add Restaurant")
 
+        # ── Step 1: search ────────────────────────────────────────────────────
         c1, c2 = st.columns([3, 2])
         with c1:
-            name = st.text_input("Restaurant Name", placeholder="e.g. Le Bernardin", key="f_name")
+            query = st.text_input(
+                "Restaurant Name",
+                placeholder="e.g. Le Bernardin",
+                key="f_name",
+            )
         with c2:
             platform = st.selectbox("Platform", ["resy", "opentable"], key="f_platform")
 
-        c3, c4 = st.columns(2)
-        with c3:
-            label = "Resy Venue ID" if platform == "resy" else "OpenTable RID"
-            vid = st.text_input(label, placeholder="e.g. 1234", key="f_vid")
-            if platform == "resy":
-                st.markdown(
-                    '<p style="color:#36367a;font-size:0.72rem;margin-top:-6px;">'
-                    '🔍 resy.com/cities/nyc/<b style="color:#5858a0">venues/restaurant-name</b>'
-                    ' → check the URL for the numeric ID</p>',
-                    unsafe_allow_html=True,
-                )
+        # Clear stale results when platform switches
+        if platform != st.session_state.search_platform:
+            st.session_state.search_results = []
+            st.session_state.selected_venue  = None
+
+        sc, _ = st.columns([1, 3])
+        with sc:
+            search_clicked = st.button("🔍  Search", key="btn_search", use_container_width=True)
+
+        if search_clicked:
+            if not query.strip():
+                st.error("Enter a restaurant name to search.")
             else:
-                st.markdown(
-                    '<p style="color:#36367a;font-size:0.72rem;margin-top:-6px;">'
-                    '🔍 opentable.com/r/restaurant-name?<b style="color:#5858a0">rid=XXXXX</b>'
-                    ' → grab the number after rid=</p>',
-                    unsafe_allow_html=True,
-                )
-        with c4:
+                with st.spinner(f"Searching {platform.title()}…"):
+                    results = (
+                        search_resy(query.strip())
+                        if platform == "resy"
+                        else search_opentable(query.strip())
+                    )
+                st.session_state.search_results  = results
+                st.session_state.search_platform = platform
+                st.session_state.selected_venue  = results[0] if results else None
+
+        # ── Step 2: pick from results ─────────────────────────────────────────
+        results = st.session_state.search_results
+        if results and st.session_state.search_platform == platform:
+
+            def _label_for(r: dict) -> str:
+                meta = " · ".join(filter(None, [r.get("neighborhood", ""), r.get("cuisine", "")]))
+                return f"{r['name']}  —  {meta}" if meta else r["name"]
+
+            options      = [_label_for(r) for r in results]
+            # Key includes platform+query so changing either resets the picker
+            picker_key   = f"f_pick_{platform}_{query}"
+            selected_idx = st.selectbox(
+                "Select a match",
+                range(len(options)),
+                format_func=lambda i: options[i],
+                key=picker_key,
+            )
+            venue = results[selected_idx]
+            st.session_state.selected_venue = venue
+
+            # Confirmation card
+            vid   = venue.get("venue_id") or venue.get("rid")
+            pc    = "#a78bfa" if platform == "resy" else "#38bdf8"
+            st.markdown(
+                f'<div style="background:#0d0d28;border:1px solid #22224a;border-radius:10px;'
+                f'padding:0.65rem 1rem;margin:0.4rem 0 0.6rem;">'
+                f'<div style="display:flex;justify-content:space-between;align-items:center;">'
+                f'<span style="color:#ddddf0;font-weight:600;font-size:0.9rem;">'
+                f'{venue["name"]}</span>'
+                f'<span style="background:{pc}22;color:{pc};padding:2px 10px;border-radius:999px;'
+                f'font-size:0.72rem;font-weight:700;">{platform.title()} ID&nbsp;{vid}</span>'
+                f'</div>'
+                f'<span style="color:#36367a;font-size:0.76rem;">'
+                f'{" · ".join(filter(None,[venue.get("neighborhood",""),venue.get("cuisine","")]))}'
+                f'</span></div>',
+                unsafe_allow_html=True,
+            )
+
+        elif search_clicked and not results:
+            st.warning(f"No results found on {platform.title()} for "{query}". Try a different name or platform.")
+
+        # ── Step 3: reservation details (shown once a venue is selected) ──────
+        venue = st.session_state.selected_venue
+        if venue and st.session_state.search_platform == platform:
+            st.markdown("<div style='height:0.2rem'></div>", unsafe_allow_html=True)
+
+            c3, c4, c5 = st.columns(3)
+            with c3:
+                res_date = st.date_input("Date", value=date.today() + timedelta(days=7), key="f_date")
+            with c4:
+                earliest = st.text_input("Earliest (HH:MM)", value="18:00", key="f_earliest")
+            with c5:
+                latest = st.text_input("Latest (HH:MM)", value="22:00", key="f_latest")
+
             party = st.number_input("Party Size", min_value=1, max_value=20, value=2, key="f_party")
 
-        c5, c6, c7 = st.columns(3)
-        with c5:
-            res_date = st.date_input("Date", value=date.today() + timedelta(days=7), key="f_date")
-        with c6:
-            earliest = st.text_input("Earliest (HH:MM)", value="18:00", key="f_earliest")
-        with c7:
-            latest = st.text_input("Latest (HH:MM)", value="22:00", key="f_latest")
-
-        if st.button("＋  Add to Watch List", key="btn_add", type="primary", use_container_width=True):
-            if not name.strip():
-                st.error("Please enter a restaurant name.")
-            elif not vid.strip() or not vid.strip().isdigit():
-                st.error("Venue ID must be a number.")
-            elif earliest >= latest:
-                st.error("Earliest time must be before latest time.")
-            else:
-                st.session_state.queue.append({
-                    "id":         st.session_state.next_id,
-                    "name":       name.strip(),
-                    "platform":   platform,
-                    "venue_id":   int(vid) if platform == "resy" else None,
-                    "rid":        int(vid) if platform == "opentable" else None,
-                    "date":       res_date.strftime("%Y-%m-%d"),
-                    "earliest":   earliest,
-                    "latest":     latest,
-                    "party_size": int(party),
-                })
-                st.session_state.next_id += 1
-                st.rerun()
+            if st.button("＋  Add to Watch List", key="btn_add", type="primary", use_container_width=True):
+                if earliest >= latest:
+                    st.error("Earliest time must be before latest time.")
+                else:
+                    vid = venue.get("venue_id") or venue.get("rid")
+                    st.session_state.queue.append({
+                        "id":         st.session_state.next_id,
+                        "name":       venue["name"],
+                        "platform":   platform,
+                        "venue_id":   vid if platform == "resy" else None,
+                        "rid":        vid if platform == "opentable" else None,
+                        "date":       res_date.strftime("%Y-%m-%d"),
+                        "earliest":   earliest,
+                        "latest":     latest,
+                        "party_size": int(party),
+                    })
+                    st.session_state.next_id     += 1
+                    st.session_state.search_results = []
+                    st.session_state.selected_venue  = None
+                    st.rerun()
 
 
 # ── Watch queue ───────────────────────────────────────────────────────────────
