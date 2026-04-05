@@ -487,7 +487,6 @@ def render_settings_and_controls():
         )
 
     st.markdown('<div style="height:0.8rem"></div>', unsafe_allow_html=True)
-    st.markdown("<hr>", unsafe_allow_html=True)
 
     if not _ms["active"]:
         if st.button("▶  Start Monitoring", key="btn_start", type="primary", use_container_width=True):
@@ -642,17 +641,11 @@ def render_log():
 # ── Main ──────────────────────────────────────────────────────────────────────
 def main():
     render_header()
-
-    left, right = st.columns([1.15, 0.85], gap="large")
-
-    with left:
-        render_add_form()
-        st.markdown('<div style="height:1rem"></div>', unsafe_allow_html=True)
-        render_queue()
-
-    with right:
-        render_settings_and_controls()
-
+    render_add_form()
+    st.markdown('<div style="height:0.6rem"></div>', unsafe_allow_html=True)
+    render_queue()
+    st.markdown("<hr>", unsafe_allow_html=True)
+    render_settings_and_controls()
     render_status()
     render_log()
 
