@@ -15,6 +15,7 @@ from email.mime.text import MIMEText
 from pathlib import Path
 
 import streamlit as st
+import streamlit.components.v1 as _components
 
 # ── project imports ───────────────────────────────────────────────────────────
 sys.path.insert(0, str(Path(__file__).parent))
@@ -121,6 +122,8 @@ st.markdown("""
     box-shadow: 0 5px 24px rgba(124,58,237,0.55) !important;
     transform: translateY(-1px) !important;
 }
+
+
 
 /* ── Secondary buttons ── */
 [data-testid="baseButton-secondary"] {
@@ -364,6 +367,20 @@ def render_add_form() -> None:
         with c3:
             label = "Resy Venue ID" if platform == "resy" else "OpenTable RID"
             vid = st.text_input(label, placeholder="e.g. 1234", key="f_vid")
+            if platform == "resy":
+                st.markdown(
+                    '<p style="color:#36367a;font-size:0.72rem;margin-top:-6px;">'
+                    '🔍 resy.com/cities/nyc/<b style="color:#5858a0">venues/restaurant-name</b>'
+                    ' → check the URL for the numeric ID</p>',
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.markdown(
+                    '<p style="color:#36367a;font-size:0.72rem;margin-top:-6px;">'
+                    '🔍 opentable.com/r/restaurant-name?<b style="color:#5858a0">rid=XXXXX</b>'
+                    ' → grab the number after rid=</p>',
+                    unsafe_allow_html=True,
+                )
         with c4:
             party = st.number_input("Party Size", min_value=1, max_value=20, value=2, key="f_party")
 
@@ -456,6 +473,24 @@ def render_settings_and_controls() -> None:
     st.markdown("<div style='height:0.6rem'></div>", unsafe_allow_html=True)
 
     if not _ms["active"]:
+        # Green colour injected via JS since Streamlit has no per-button colour prop.
+        _components.html("""<script>
+            (function paint() {
+                const btns = window.parent.document.querySelectorAll(
+                    '[data-testid="baseButton-primary"]');
+                let found = false;
+                btns.forEach(b => {
+                    if (b.innerText.includes('Start Monitoring')) {
+                        b.style.setProperty('background',
+                            'linear-gradient(135deg,#16a34a,#15803d)', 'important');
+                        b.style.setProperty('box-shadow',
+                            '0 2px 16px rgba(22,163,74,0.38)', 'important');
+                        found = true;
+                    }
+                });
+                if (!found) setTimeout(paint, 80);
+            })();
+        </script>""", height=0)
         if st.button("▶  Start Monitoring", key="btn_start", type="primary", use_container_width=True):
             phone_val = (phone or "").strip()
             if not st.session_state.queue:
