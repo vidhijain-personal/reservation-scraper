@@ -70,7 +70,7 @@ def search_resy(query: str) -> list:
     """
     try:
         resp = requests.get(
-            "https://api.resy.com/3/venue/find",
+            "https://api.resy.com/3/venues",
             headers={
                 "Authorization": f'ResyAPI api_key="{_RESY_API_KEY}"',
                 "X-Origin":      "https://resy.com",
@@ -79,13 +79,12 @@ def search_resy(query: str) -> list:
                     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
                     "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
                 ),
+                "Accept": "application/json, text/plain, */*",
             },
             params={
-                "query":      query,
-                "geo[city]":  "New York",
-                "geo[lat]":   40.7128,
-                "geo[long]":  -74.0060,
-                "geo[radius]": 0.5,
+                "query":     query,
+                "city_code": "NY",
+                "per_page":  8,
             },
             timeout=10,
         )
@@ -96,16 +95,15 @@ def search_resy(query: str) -> list:
         return []
 
     results = []
-    for item in data.get("search", {}).get("venues", [])[:8]:
-        info  = item.get("venue", {})
-        vid   = info.get("id", {}).get("resy")
+    for item in data.get("results", {}).get("venues", [])[:8]:
+        vid = item.get("id", {}).get("resy")
         if not vid:
             continue
         results.append({
-            "name":         info.get("name", ""),
+            "name":         item.get("name", ""),
             "venue_id":     vid,
-            "neighborhood": info.get("location", {}).get("neighborhood", ""),
-            "cuisine":      ", ".join(info.get("type", [])),
+            "neighborhood": item.get("location", {}).get("neighborhood", ""),
+            "cuisine":      item.get("type", ""),
         })
     return results
 
