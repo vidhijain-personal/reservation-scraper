@@ -21,10 +21,16 @@ import streamlit.components.v1 as _components
 sys.path.insert(0, str(Path(__file__).parent))
 from monitor import check_resy, check_opentable
 
+# On Streamlit Cloud, credentials live in the secrets dashboard.
+# Locally, they live in config.py (gitignored).
 try:
-    from config import GMAIL_FROM, GMAIL_PASSWORD
-except ImportError:
-    GMAIL_FROM = GMAIL_PASSWORD = ""
+    GMAIL_FROM     = st.secrets["GMAIL_FROM"]
+    GMAIL_PASSWORD = st.secrets["GMAIL_PASSWORD"]
+except (KeyError, FileNotFoundError):
+    try:
+        from config import GMAIL_FROM, GMAIL_PASSWORD
+    except ImportError:
+        GMAIL_FROM = GMAIL_PASSWORD = ""
 
 # ── page config ───────────────────────────────────────────────────────────────
 st.set_page_config(

@@ -29,10 +29,9 @@ import requests
 try:
     from config import GMAIL_FROM, GMAIL_PASSWORD, SMS_TO
 except ImportError:
-    raise SystemExit(
-        "ERROR: config.py not found.\n"
-        "Copy config.example.py to config.py and fill in your Gmail and SMS details."
-    )
+    # config.py is gitignored; credentials come from Streamlit secrets when
+    # used via app.py, or from env vars. CLI users need to create config.py.
+    GMAIL_FROM = GMAIL_PASSWORD = SMS_TO = ""
 
 logging.basicConfig(
     level=logging.INFO,
