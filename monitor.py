@@ -107,6 +107,28 @@ def lookup_resy_venue(url: str):
     }
 
 
+def parse_opentable_url(url: str):
+    """
+    Extract rid and a human-readable name from an OpenTable URL.
+    e.g. https://www.opentable.com/r/carbone-new-york?rid=149495
+    Returns {rid, name} or None if no rid found.
+    """
+    import re
+    rid_match = re.search(r'[?&]rid=(\d+)', url)
+    if not rid_match:
+        rid_match = re.search(r'/restref=(\d+)', url)
+    if not rid_match:
+        return None
+    rid = int(rid_match.group(1))
+    # Derive name from the URL slug: /r/carbone-new-york → "Carbone New York"
+    slug_match = re.search(r'/r/([^/?#]+)', url)
+    if slug_match:
+        name = slug_match.group(1).replace('-', ' ').title()
+    else:
+        name = f"Restaurant {rid}"
+    return {"rid": rid, "name": name}
+
+
 def search_resy(query: str) -> list:
     """
     Search Resy for venues in NYC matching query.

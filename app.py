@@ -18,7 +18,7 @@ import streamlit as st
 import streamlit.components.v1 as _components
 
 sys.path.insert(0, str(Path(__file__).parent))
-from monitor import check_resy, check_opentable, lookup_resy_venue
+from monitor import check_resy, check_opentable, lookup_resy_venue, parse_opentable_url
 
 try:
     GMAIL_FROM     = st.secrets["GMAIL_FROM"]
@@ -369,7 +369,7 @@ def render_header() -> None:
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
           {status_dot}
-          <span style="color:#122040;font-size:0.7rem;">{last_str}</span>
+          {'<span style="color:#122040;font-size:0.7rem;">' + last_str + '</span>' if last_str else ''}
         </div>
       </div>
     </div>
@@ -555,24 +555,34 @@ def render_form() -> None:
     else:
         st.markdown(
             '<p style="color:#1a3458;font-size:0.76rem;margin:0.15rem 0 0.45rem;">'
-            'Go to <a href="https://www.opentable.com" target="_blank" '
-            'style="color:#38bdf8;text-decoration:none;">opentable.com</a>, open the restaurant '
-            'page, and copy the <code style="color:#38bdf8;background:#060e1c;'
-            'padding:1px 5px;border-radius:4px;">rid=XXXXX</code> from the URL.</p>',
+            'Paste the OpenTable URL from your browser for the restaurant you want to monitor.</p>',
             unsafe_allow_html=True,
         )
-        resolved_name = st.text_input(
-            "Restaurant Name",
-            placeholder="e.g. Carbone",
-            key=f"f_ot_name_{g}",
+        ot_url = st.text_input(
+            "OpenTable URL",
+            placeholder="https://www.opentable.com/r/carbone-new-york?rid=149495",
+            key=f"f_ot_url_{g}",
         )
-        venue_id = st.number_input(
-            "OpenTable rid",
-            min_value=1,
-            value=1,
-            step=1,
-            key=f"f_ot_id_{g}",
-        )
+        if ot_url and "opentable.com" in ot_url:
+            info = parse_opentable_url(ot_url)
+            if info:
+                venue_id      = info["rid"]
+                resolved_name = info["name"]
+                st.markdown(
+                    f'<div style="background:linear-gradient(135deg,#060d1c,#060b18);'
+                    f'border:1px solid #0f2040;border-radius:10px;'
+                    f'padding:0.7rem 1rem;margin:0.3rem 0 0.6rem;">'
+                    f'<div style="display:flex;justify-content:space-between;align-items:center;">'
+                    f'<span style="color:#c8d8f0;font-weight:600;font-size:0.92rem;">{info["name"]}</span>'
+                    f'<span style="background:#0e40801a;color:#22d3ee;padding:2px 10px;'
+                    f'border-radius:999px;font-size:0.7rem;font-weight:700;">'
+                    f'OpenTable rid&nbsp;{venue_id}</span>'
+                    f'</div>'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.warning("Couldn't find a rid in that URL — make sure it contains ?rid=XXXXX.")
 
     st.markdown("<div style='height:0.3rem'></div>", unsafe_allow_html=True)
     _h("Reservation Details")
@@ -637,11 +647,11 @@ def render_form() -> None:
         }
 
     def _validate():
-        if platform == "resy" and not venue_id:
-            st.error("Paste a valid Resy URL so the venue can be identified.")
-            return False
-        if platform == "opentable" and not resolved_name.strip():
-            st.error("Enter the restaurant name.")
+        if not venue_id:
+            msg = "Paste a valid Resy URL so the venue can be identified." \
+                  if platform == "resy" else \
+                  "Paste a valid OpenTable URL containing ?rid=XXXXX."
+            st.error(msg)
             return False
         if earliest >= latest:
             st.error("Earliest must be before latest time.")
@@ -705,7 +715,7 @@ def render_form() -> None:
             phone_val = (phone or "").strip()
             # Auto-include the current form if it's filled out and not already queued
             all_restaurants = list(st.session_state.pending)
-            form_filled = (platform == "resy" and venue_id) or (platform == "opentable" and resolved_name.strip())
+            form_filled = bool(venue_id)
             if form_filled and _validate():
                 all_restaurants.append(_build_entry())
                 st.session_state.next_id += 1
@@ -728,7 +738,7 @@ def render_form() -> None:
 
         # Add-more shortcut while monitoring is active
         if st.button("＋  Add to Active Monitor", key="btn_add_live", use_container_width=True):
-            form_filled = (platform == "resy" and venue_id) or (platform == "opentable" and resolved_name.strip())
+            form_filled = bool(venue_id)
             if form_filled and _validate():
                 entry = _build_entry()
                 with _lock:
