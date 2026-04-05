@@ -63,6 +63,50 @@ _RESY_API_KEY = "VbWk7s3L4KiK5fzlO7JD3Q5EYolJI7n5"
 
 # ── Venue search ──────────────────────────────────────────────────────────────
 
+def lookup_resy_venue(url: str):
+    """
+    Given a Resy venue URL (e.g. https://resy.com/cities/new-york-ny/venues/lilia),
+    extract the slug + location and return {venue_id, name, neighborhood, cuisine}
+    or None on failure.
+    """
+    import re
+    m = re.search(r"/cities/([^/]+)/venues/([^/?#]+)", url)
+    if not m:
+        return None
+    location, slug = m.group(1), m.group(2)
+    try:
+        resp = requests.get(
+            "https://api.resy.com/3/venue",
+            headers={
+                "Authorization": f'ResyAPI api_key="{_RESY_API_KEY}"',
+                "X-Origin":      "https://resy.com",
+                "Referer":       "https://resy.com/",
+                "User-Agent":    (
+                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+                ),
+                "Accept": "application/json, text/plain, */*",
+            },
+            params={"url_slug": slug, "location": location},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+    except Exception as exc:
+        log.warning("Resy venue lookup error: %s", exc)
+        return None
+
+    venue_id = data.get("id", {}).get("resy")
+    if not venue_id:
+        return None
+    return {
+        "venue_id":     venue_id,
+        "name":         data.get("name", slug),
+        "neighborhood": data.get("location", {}).get("neighborhood", ""),
+        "cuisine":      data.get("type", ""),
+    }
+
+
 def search_resy(query: str) -> list:
     """
     Search Resy for venues in NYC matching query.

@@ -19,7 +19,7 @@ import streamlit.components.v1 as _components
 
 # ── project imports ───────────────────────────────────────────────────────────
 sys.path.insert(0, str(Path(__file__).parent))
-from monitor import check_resy, check_opentable
+from monitor import check_resy, check_opentable, lookup_resy_venue
 
 # On Streamlit Cloud, credentials live in the secrets dashboard.
 # Locally, they live in config.py (gitignored).
@@ -372,18 +372,39 @@ def render_add_form() -> None:
         if platform == "resy":
             st.markdown(
                 '<p style="color:#36367a;font-size:0.78rem;margin:0.25rem 0 0.5rem;">'
-                'Find the ID: go to '
-                '<a href="https://resy.com" target="_blank" style="color:#a78bfa;text-decoration:none;">resy.com</a>'
-                ', open the restaurant page, and look for '
-                '<code style="color:#a78bfa;background:#0e0e26;padding:1px 5px;border-radius:4px;">'
-                'venue_id=XXXXX</code> in the URL, or use the '
-                '<a href="https://api.resy.com/3/venues?query=RESTAURANT&city_code=NY" '
-                'target="_blank" style="color:#a78bfa;text-decoration:none;">Resy venues API</a>'
-                ' and find the <code style="color:#a78bfa;background:#0e0e26;padding:1px 5px;border-radius:4px;">'
-                '"resy"</code> id field.</p>',
+                'Paste the Resy URL from your browser for the restaurant you want to monitor.'
+                '</p>',
                 unsafe_allow_html=True,
             )
-            venue_id = st.number_input("Resy Venue ID", min_value=1, value=1, step=1, key="f_resy_id")
+            resy_url = st.text_input(
+                "Resy URL",
+                placeholder="https://resy.com/cities/new-york-ny/venues/lilia",
+                key="f_resy_url",
+            )
+            # Auto-resolve venue ID when URL looks valid
+            venue_id = None
+            resolved_name = ""
+            if resy_url and "/venues/" in resy_url:
+                with st.spinner("Looking up venue…"):
+                    info = lookup_resy_venue(resy_url)
+                if info:
+                    venue_id = info["venue_id"]
+                    resolved_name = info["name"]
+                    meta = " · ".join(filter(None, [info.get("neighborhood", ""), info.get("cuisine", "")]))
+                    st.markdown(
+                        f'<div style="background:#0d0d28;border:1px solid #22224a;border-radius:10px;'
+                        f'padding:0.65rem 1rem;margin:0.3rem 0 0.5rem;">'
+                        f'<div style="display:flex;justify-content:space-between;align-items:center;">'
+                        f'<span style="color:#ddddf0;font-weight:600;font-size:0.9rem;">{info["name"]}</span>'
+                        f'<span style="background:#a78bfa22;color:#a78bfa;padding:2px 10px;border-radius:999px;'
+                        f'font-size:0.72rem;font-weight:700;">Resy ID&nbsp;{venue_id}</span>'
+                        f'</div>'
+                        f'<span style="color:#36367a;font-size:0.76rem;">{meta}</span>'
+                        f'</div>',
+                        unsafe_allow_html=True,
+                    )
+                else:
+                    st.warning("Couldn't resolve that URL — check it's a valid Resy restaurant page.")
         else:
             st.markdown(
                 '<p style="color:#36367a;font-size:0.78rem;margin:0.25rem 0 0.5rem;">'
@@ -409,14 +430,17 @@ def render_add_form() -> None:
         party = st.number_input("Party Size", min_value=1, max_value=20, value=2, key="f_party")
 
         if st.button("＋  Add to Watch List", key="btn_add", type="primary", use_container_width=True):
-            if not name.strip():
+            display_name = resolved_name if platform == "resy" and resolved_name else name.strip()
+            if platform == "resy" and not venue_id:
+                st.error("Paste a valid Resy URL so the venue can be identified.")
+            elif platform == "opentable" and not name.strip():
                 st.error("Enter a restaurant name.")
             elif earliest >= latest:
                 st.error("Earliest time must be before latest time.")
             else:
                 st.session_state.queue.append({
                     "id":         st.session_state.next_id,
-                    "name":       name.strip(),
+                    "name":       display_name,
                     "platform":   platform,
                     "venue_id":   int(venue_id) if platform == "resy" else None,
                     "rid":        int(venue_id) if platform == "opentable" else None,
