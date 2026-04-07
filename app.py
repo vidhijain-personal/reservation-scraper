@@ -20,9 +20,17 @@ from flask import Flask, jsonify, render_template, request
 
 from monitor import check_opentable, check_resy, lookup_resy_venue, parse_opentable_url
 
-# ── Credentials (from environment variables) ──────────────────────────────────
+# ── Credentials ───────────────────────────────────────────────────────────────
+# Production: set GMAIL_FROM and GMAIL_PASSWORD as environment variables.
+# Local dev: falls back to config.py (gitignored).
 GMAIL_FROM     = os.environ.get("GMAIL_FROM", "")
 GMAIL_PASSWORD = os.environ.get("GMAIL_PASSWORD", "")
+
+if not GMAIL_FROM or not GMAIL_PASSWORD:
+    try:
+        from config import GMAIL_FROM, GMAIL_PASSWORD
+    except ImportError:
+        pass
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 logging.basicConfig(
