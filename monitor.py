@@ -109,23 +109,65 @@ def lookup_resy_venue(url: str):
 
 def parse_opentable_url(url: str):
     """
-    Extract rid and a human-readable name from an OpenTable URL.
-    e.g. https://www.opentable.com/r/carbone-new-york?rid=149495
-    Returns {rid, name} or None if no rid found.
+    Extract rid and a human-readable name from an OpenTable restaurant URL.
+
+    Handles URLs with rid already present:
+      https://www.opentable.com/r/carbone-new-york?rid=149495
+    And URLs without rid (fetches the page to scrape it):
+      https://www.opentable.com/r/tao-downtown-new-york?originId=...
+
+    Returns {rid, name} or None on failure.
     """
     import re
+
+    slug_match = re.search(r'/r/([^/?#]+)', url)
+    slug = slug_match.group(1) if slug_match else None
+
+    # Try to get rid directly from the URL first
     rid_match = re.search(r'[?&]rid=(\d+)', url)
     if not rid_match:
-        rid_match = re.search(r'/restref=(\d+)', url)
-    if not rid_match:
+        rid_match = re.search(r'[?&]restref=(\d+)', url)
+
+    if rid_match:
+        rid = int(rid_match.group(1))
+        name = slug.replace('-', ' ').title() if slug else f"Restaurant {rid}"
+        return {"rid": rid, "name": name}
+
+    # No rid in URL — fetch the restaurant page and scrape it
+    if not slug:
         return None
+
+    try:
+        resp = requests.get(
+            f"https://www.opentable.com/r/{slug}",
+            headers={
+                "User-Agent": (
+                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+                ),
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "Accept-Language": "en-US,en;q=0.5",
+            },
+            timeout=15,
+            allow_redirects=True,
+        )
+        html = resp.text
+    except Exception as exc:
+        log.warning("OpenTable page fetch error: %s", exc)
+        return None
+
+    # rid appears in canonical/og:url links and embedded JSON — any match works
+    rid_match = (
+        re.search(r'[?&]rid=(\d+)', html)
+        or re.search(r'"rid"\s*:\s*(\d+)', html)
+        or re.search(r'"restaurantId"\s*:\s*(\d+)', html)
+    )
+    if not rid_match:
+        log.warning("Could not find rid in OpenTable page for slug: %s", slug)
+        return None
+
     rid = int(rid_match.group(1))
-    # Derive name from the URL slug: /r/carbone-new-york → "Carbone New York"
-    slug_match = re.search(r'/r/([^/?#]+)', url)
-    if slug_match:
-        name = slug_match.group(1).replace('-', ' ').title()
-    else:
-        name = f"Restaurant {rid}"
+    name = slug.replace('-', ' ').title()
     return {"rid": rid, "name": name}
 
 
@@ -420,15 +462,40 @@ def prompt_setup() -> tuple:
 
 # ── Alert ─────────────────────────────────────────────────────────────────────
 
+def _fmt_time(hhmm: str) -> str:
+    h, m = map(int, hhmm.split(":"))
+    period = "AM" if h < 12 else "PM"
+    h12 = h % 12 or 12
+    return f"{h12}:{m:02d} {period}"
+
+
+def _fmt_date(date_str: str) -> str:
+    from datetime import datetime
+    return datetime.strptime(date_str, "%Y-%m-%d").strftime("%B %-d")
+
+
+def _restaurant_url(restaurant: dict) -> str:
+    if restaurant.get("url"):
+        return restaurant["url"]
+    if restaurant.get("platform") == "opentable" and restaurant.get("rid"):
+        return f"https://www.opentable.com/restaurant/profile/{restaurant['rid']}"
+    return "https://resy.com"
+
+
 def send_alert(restaurant: dict, slots: list) -> None:
     """Send an SMS alert via Gmail SMTP → T-Mobile email gateway."""
-    times_str = ", ".join(slots)
+    times_12h = ", ".join(_fmt_time(t) for t in slots)
+    url = _restaurant_url(restaurant)
     body = (
-        f"{restaurant['name']} ({restaurant['platform']}) has openings on "
-        f"{restaurant['date']}: {times_str} for {restaurant['party_size']}. Book now!"
+        f"Reservation Alert: {restaurant['name']} - "
+        f"A table for {restaurant['party_size']} is available on {_fmt_date(restaurant['date'])} - "
+        f"grab it before it's gone!\n\n"
+        f"Available times: {times_12h}\n\n"
+        f"Book now: {url}\n\n"
+        f"Thanks for using Vidhi's reservation scraper!"
     )
-    msg = MIMEText(body)
-    msg["Subject"] = f"Reservation open: {restaurant['name']}"
+    msg = MIMEText(body, "plain", "utf-8")
+    msg["Subject"] = f"Reservation Alert: {restaurant['name']}"
     msg["From"]    = GMAIL_FROM
     msg["To"]      = SMS_TO
 
@@ -436,7 +503,7 @@ def send_alert(restaurant: dict, slots: list) -> None:
         with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
             smtp.login(GMAIL_FROM, GMAIL_PASSWORD)
             smtp.sendmail(GMAIL_FROM, SMS_TO, msg.as_string())
-        log.info("SMS sent  — [%d] %s on %s: %s", restaurant["id"], restaurant["name"], restaurant["date"], times_str)
+        log.info("SMS sent  — [%d] %s on %s: %s", restaurant["id"], restaurant["name"], restaurant["date"], times_12h)
     except smtplib.SMTPAuthenticationError:
         log.error(
             "Gmail authentication failed. Make sure GMAIL_PASSWORD is a Google "

@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reservation Monitor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:         #0f0f0f;
+      --surface:    #1a1a1a;
+      --surface2:   #222222;
+      --border:     #2e2e2e;
+      --text:       #f0f0f0;
+      --muted:      #888888;
+      --accent:     #e84040;
+      --accent-h:   #c93030;
+      --success:    #4ade80;
+      --warning:    #fb923c;
+      --info:       #60a5fa;
+      --radius:     10px;
+      --radius-sm:  6px;
+      --shadow:     0 2px 16px rgba(0,0,0,0.5);
+    }
+
+    html, body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', system-ui, sans-serif;
+      font-size: 15px;
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    .page {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 3rem 1.25rem 5rem;
+    }
+
+    /* ── Header ── */
+    .header {
+      margin-bottom: 2.5rem;
+    }
+    .header h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 4px;
+    }
+    .header p {
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+
+    /* ── Card ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      box-shadow: var(--shadow);
+    }
+
+    /* ── Form elements ── */
+    .field {
+      margin-bottom: 1.1rem;
+    }
+    .field:last-child { margin-bottom: 0; }
+
+    label {
+      display: block;
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 0.4rem;
+    }
+
+    input[type="text"],
+    input[type="number"],
+    input[type="date"],
+    input[type="tel"],
+    select {
+      width: 100%;
+      background: var(--bg);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.92rem;
+      padding: 0.6rem 0.75rem;
+      transition: border-color 0.15s;
+      outline: none;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    input:focus, select:focus {
+      border-color: var(--accent);
+    }
+    input::placeholder { color: #444; }
+    input[type="date"]::-webkit-calendar-picker-indicator {
+      filter: invert(0.5);
+      cursor: pointer;
+    }
+    select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23888' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 0.75rem center;
+      padding-right: 2rem;
+    }
+
+    /* ── Platform toggle ── */
+    .platform-toggle {
+      display: flex;
+      gap: 0.5rem;
+    }
+    .platform-toggle input { display: none; }
+    .platform-toggle label {
+      flex: 1;
+      text-align: center;
+      padding: 0.55rem;
+      background: var(--bg);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: 0.82rem;
+      font-weight: 600;
+      text-transform: none;
+      letter-spacing: normal;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.15s;
+      margin-bottom: 0;
+    }
+    .platform-toggle input:checked + label {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    /* ── Row ── */
+    .row {
+      display: grid;
+      gap: 0.75rem;
+    }
+    .row-2 { grid-template-columns: 1fr 1fr; }
+    .row-3 { grid-template-columns: 1fr 1fr 1fr; }
+
+    /* ── Resolve card ── */
+    .resolve-card {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 0.75rem 0.9rem;
+      margin-top: 0.5rem;
+      display: none;
+      animation: fadeIn 0.2s ease;
+    }
+    .resolve-card.visible { display: block; }
+    .resolve-card .r-name {
+      font-weight: 600;
+      font-size: 0.95rem;
+      margin-bottom: 2px;
+    }
+    .resolve-card .r-meta {
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+    .resolve-card .r-badge {
+      display: inline-block;
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 999px;
+      margin-top: 4px;
+    }
+    .badge-resy { background: rgba(232,64,64,0.15); color: var(--accent); }
+    .badge-ot   { background: rgba(96,165,250,0.15); color: var(--info); }
+
+    .resolve-error {
+      font-size: 0.8rem;
+      color: var(--accent);
+      margin-top: 0.4rem;
+      display: none;
+    }
+    .resolve-error.visible { display: block; }
+
+    /* ── Hint text ── */
+    .hint {
+      font-size: 0.76rem;
+      color: #555;
+      margin-bottom: 0.4rem;
+    }
+
+    /* ── Divider ── */
+    .divider {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 1.4rem 0;
+    }
+
+    /* ── Section label ── */
+    .section-label {
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #444;
+      margin-bottom: 1rem;
+    }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+      padding: 0.65rem 1.25rem;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-family: inherit;
+      font-size: 0.88rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+      width: 100%;
+      padding: 0.8rem;
+      font-size: 0.95rem;
+    }
+    .btn-primary:hover:not(:disabled) { background: var(--accent-h); }
+    .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-ghost {
+      background: transparent;
+      border: 1.5px solid var(--border);
+      color: var(--muted);
+      font-size: 0.78rem;
+      padding: 0.35rem 0.7rem;
+    }
+    .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* ── Spinner ── */
+    .spinner {
+      width: 14px; height: 14px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: none;
+    }
+    .spinner.visible { display: block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Monitor list ── */
+    #monitors-section {
+      margin-top: 2.5rem;
+      display: none;
+    }
+    #monitors-section.visible { display: block; }
+
+    .monitor-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem 1.1rem;
+      margin-bottom: 0.6rem;
+      display: flex;
+      align-items: flex-start;
+      gap: 0.9rem;
+      box-shadow: var(--shadow);
+      animation: fadeIn 0.25s ease;
+      transition: opacity 0.3s, transform 0.3s;
+    }
+    .monitor-card.removing {
+      opacity: 0;
+      transform: translateX(12px);
+    }
+
+    .status-dot {
+      width: 9px; height: 9px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      margin-top: 5px;
+    }
+    .dot-watching { background: var(--info); box-shadow: 0 0 8px rgba(96,165,250,0.5); }
+    .dot-found    { background: var(--success); box-shadow: 0 0 8px rgba(74,222,128,0.5); }
+    .dot-expired  { background: var(--warning); }
+    .dot-cancelled{ background: #444; }
+
+    .monitor-body { flex: 1; min-width: 0; }
+    .monitor-name {
+      font-weight: 600;
+      font-size: 0.95rem;
+      margin-bottom: 3px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .monitor-meta {
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    .monitor-status {
+      font-size: 0.78rem;
+      font-weight: 500;
+    }
+    .status-watching { color: var(--info); }
+    .status-found    { color: var(--success); }
+    .status-expired  { color: var(--warning); }
+    .status-cancelled{ color: #555; }
+
+    .monitor-dismiss {
+      background: none;
+      border: none;
+      color: #444;
+      font-size: 1.1rem;
+      cursor: pointer;
+      padding: 0 0.2rem;
+      line-height: 1;
+      flex-shrink: 0;
+      transition: color 0.15s;
+      margin-top: -2px;
+    }
+    .monitor-dismiss:hover { color: var(--accent); }
+
+    /* ── Animations ── */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Error / success messages ── */
+    #form-error {
+      font-size: 0.82rem;
+      color: var(--accent);
+      margin-top: 0.8rem;
+      display: none;
+    }
+    #form-error.visible { display: block; }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Header -->
+  <div class="header">
+    <h1>Reservation Monitor</h1>
+    <p>Watch Resy &amp; OpenTable. Get a text when a table opens up.</p>
+  </div>
+
+  <!-- Form card -->
+  <div class="card">
+
+    <!-- Platform -->
+    <div class="field">
+      <label>Platform</label>
+      <div class="platform-toggle">
+        <input type="radio" name="platform" id="p-resy" value="resy" checked />
+        <label for="p-resy">Resy</label>
+        <input type="radio" name="platform" id="p-opentable" value="opentable" />
+        <label for="p-opentable">OpenTable</label>
+      </div>
+    </div>
+
+    <!-- URL input -->
+    <div class="field">
+      <label>Restaurant URL</label>
+      <p class="hint" id="url-hint">Paste the Resy URL from your browser.</p>
+      <input
+        type="text"
+        id="venue-url"
+        placeholder="https://resy.com/cities/new-york-ny/venues/lilia"
+        autocomplete="off"
+        spellcheck="false"
+      />
+      <div class="resolve-error" id="resolve-error"></div>
+      <div class="resolve-card" id="resolve-card">
+        <div class="r-name" id="r-name"></div>
+        <div class="r-meta" id="r-meta"></div>
+        <span class="r-badge" id="r-badge"></span>
+      </div>
+    </div>
+
+    <hr class="divider" />
+    <div class="section-label">Reservation Details</div>
+
+    <!-- Date -->
+    <div class="field">
+      <label>Date</label>
+      <input type="date" id="res-date" />
+    </div>
+
+    <!-- Time window -->
+    <div class="field row row-2">
+      <div>
+        <label>Earliest Time</label>
+        <input type="text" id="earliest" value="18:00" placeholder="18:00" maxlength="5" />
+      </div>
+      <div>
+        <label>Latest Time</label>
+        <input type="text" id="latest" value="22:00" placeholder="22:00" maxlength="5" />
+      </div>
+    </div>
+
+    <!-- Party size -->
+    <div class="field">
+      <label>Party Size</label>
+      <input type="number" id="party-size" value="2" min="1" max="20" />
+    </div>
+
+    <hr class="divider" />
+    <div class="section-label">Alert Settings</div>
+
+    <!-- Phone -->
+    <div class="field">
+      <label>Phone Number</label>
+      <p class="hint">10 digits, T-Mobile number (SMS via email gateway).</p>
+      <input type="tel" id="phone" placeholder="2125551234" maxlength="10" />
+    </div>
+
+    <!-- Frequency + Stop date -->
+    <div class="field row row-2">
+      <div>
+        <label>Check Every (minutes)</label>
+        <input type="number" id="frequency" value="5" min="1" max="120" />
+      </div>
+      <div>
+        <label>Stop Monitoring After</label>
+        <input type="date" id="stop-date" />
+      </div>
+    </div>
+
+    <div id="form-error"></div>
+
+    <div class="field" style="margin-top:1.2rem;">
+      <button class="btn btn-primary" id="start-btn" onclick="startMonitor()">
+        <span class="spinner" id="start-spinner"></span>
+        <span id="start-label">Start Monitoring</span>
+      </button>
+    </div>
+
+  </div><!-- /card -->
+
+  <!-- Active monitors -->
+  <div id="monitors-section">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.9rem;margin-top:0.2rem;">
+      <span style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#444;">
+        Active Monitors
+      </span>
+      <button class="btn btn-ghost" onclick="clearCompleted()">Clear Completed</button>
+    </div>
+    <div id="monitor-list"></div>
+  </div>
+
+</div><!-- /page -->
+
+<script>
+// ── State ────────────────────────────────────────────────────────────────────
+let resolved = null;   // {name, venue_id|rid, url, meta, platform}
+let resolveTimer = null;
+const MAX_STOP_DAYS = 30;
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+document.addEventListener("DOMContentLoaded", () => {
+  const today = new Date();
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  document.getElementById("res-date").value = fmtDateInput(tomorrow);
+  document.getElementById("res-date").min   = fmtDateInput(today);
+
+  const maxStop = new Date(today);
+  maxStop.setDate(maxStop.getDate() + MAX_STOP_DAYS);
+  document.getElementById("stop-date").value = fmtDateInput(maxStop);
+  document.getElementById("stop-date").max   = fmtDateInput(maxStop);
+  document.getElementById("stop-date").min   = fmtDateInput(today);
+
+  document.querySelectorAll("input[name='platform']").forEach(r => {
+    r.addEventListener("change", onPlatformChange);
+  });
+
+  document.getElementById("venue-url").addEventListener("input", onUrlInput);
+
+  pollMonitors();
+  setInterval(pollMonitors, 5000);
+});
+
+function fmtDateInput(d) {
+  return d.toISOString().split("T")[0];
+}
+
+function getPlatform() {
+  return document.querySelector("input[name='platform']:checked").value;
+}
+
+// ── Platform change ───────────────────────────────────────────────────────────
+function onPlatformChange() {
+  const plat = getPlatform();
+  document.getElementById("url-hint").textContent =
+    plat === "resy"
+      ? "Paste the Resy URL from your browser."
+      : "Paste the OpenTable URL from your browser.";
+  document.getElementById("venue-url").placeholder =
+    plat === "resy"
+      ? "https://resy.com/cities/new-york-ny/venues/lilia"
+      : "https://www.opentable.com/r/tao-downtown-new-york";
+  clearResolve();
+}
+
+// ── URL resolve (debounced) ────────────────────────────────────────────────────
+function onUrlInput() {
+  clearTimeout(resolveTimer);
+  const url = document.getElementById("venue-url").value.trim();
+  if (url.length < 12) { clearResolve(); return; }
+  resolveTimer = setTimeout(() => resolveUrl(url), 600);
+}
+
+function clearResolve() {
+  resolved = null;
+  hide("resolve-card");
+  hide("resolve-error");
+}
+
+async function resolveUrl(url) {
+  const plat = getPlatform();
+  hide("resolve-card");
+  hide("resolve-error");
+
+  try {
+    const resp = await fetch("/api/resolve", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ platform: plat, url }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) {
+      showError("resolve-error", data.error || "Could not resolve URL.");
+      resolved = null;
+      return;
+    }
+    resolved = { ...data, platform: plat };
+    document.getElementById("r-name").textContent = data.name;
+    document.getElementById("r-meta").textContent = data.meta || "";
+    const badge = document.getElementById("r-badge");
+    badge.textContent = plat === "resy" ? "Resy" : "OpenTable";
+    badge.className = "r-badge " + (plat === "resy" ? "badge-resy" : "badge-ot");
+    show("resolve-card");
+  } catch (e) {
+    showError("resolve-error", "Network error — check your connection.");
+    resolved = null;
+  }
+}
+
+// ── Start monitoring ──────────────────────────────────────────────────────────
+async function startMonitor() {
+  const err = document.getElementById("form-error");
+  err.className = ""; err.style.display = "none";
+
+  if (!resolved) {
+    showError("form-error", "Paste a valid restaurant URL first and wait for it to resolve.");
+    return;
+  }
+
+  const phone = document.getElementById("phone").value.trim();
+  if (phone.length !== 10 || !/^\d{10}$/.test(phone)) {
+    showError("form-error", "Enter a valid 10-digit phone number.");
+    return;
+  }
+
+  const earliest = document.getElementById("earliest").value.trim();
+  const latest   = document.getElementById("latest").value.trim();
+  if (!/^\d{2}:\d{2}$/.test(earliest) || !/^\d{2}:\d{2}$/.test(latest)) {
+    showError("form-error", "Times must be in HH:MM format (e.g. 18:00).");
+    return;
+  }
+  if (earliest >= latest) {
+    showError("form-error", "Earliest time must be before latest time.");
+    return;
+  }
+
+  const stopDate = document.getElementById("stop-date").value;
+  if (!stopDate) {
+    showError("form-error", "Select a stop date.");
+    return;
+  }
+
+  setBusy(true);
+
+  const plat = getPlatform();
+  const body = {
+    platform:   plat,
+    name:       resolved.name,
+    venue_id:   resolved.venue_id || null,
+    rid:        resolved.rid || null,
+    url:        resolved.url || "",
+    date:       document.getElementById("res-date").value,
+    earliest,
+    latest,
+    party_size: parseInt(document.getElementById("party-size").value) || 2,
+    phone,
+    frequency:  parseInt(document.getElementById("frequency").value) || 5,
+    stop_date:  stopDate,
+  };
+
+  try {
+    const resp = await fetch("/api/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await resp.json();
+    if (!resp.ok) {
+      showError("form-error", data.error || "Failed to start monitoring.");
+      setBusy(false);
+      return;
+    }
+    // Success — reset form
+    clearResolve();
+    document.getElementById("venue-url").value = "";
+    setBusy(false);
+    pollMonitors();
+  } catch (e) {
+    showError("form-error", "Network error — could not reach server.");
+    setBusy(false);
+  }
+}
+
+// ── Stop / dismiss monitor ────────────────────────────────────────────────────
+async function stopMonitor(id) {
+  await fetch(`/api/monitor/${id}`, { method: "DELETE" });
+  pollMonitors();
+}
+
+async function dismissMonitor(id) {
+  const card = document.getElementById(`mc-${id}`);
+  if (card) {
+    card.classList.add("removing");
+    await new Promise(r => setTimeout(r, 300));
+  }
+  await fetch(`/api/monitor/${id}`, { method: "DELETE" });
+  pollMonitors();
+}
+
+function clearCompleted() {
+  document.querySelectorAll(".monitor-card[data-done='true']").forEach(card => {
+    const id = card.dataset.id;
+    dismissMonitor(id);
+  });
+}
+
+// ── Poll monitors ─────────────────────────────────────────────────────────────
+async function pollMonitors() {
+  try {
+    const resp = await fetch("/api/monitors");
+    const monitors = await resp.json();
+    renderMonitors(monitors);
+  } catch (e) { /* silently ignore poll errors */ }
+}
+
+function renderMonitors(monitors) {
+  const section = document.getElementById("monitors-section");
+  const list    = document.getElementById("monitor-list");
+
+  if (!monitors.length) {
+    section.classList.remove("visible");
+    list.innerHTML = "";
+    return;
+  }
+
+  section.classList.add("visible");
+
+  // Build set of current IDs to avoid full re-render flicker on active cards
+  const existingIds = new Set(
+    [...list.querySelectorAll(".monitor-card")].map(c => c.dataset.id)
+  );
+  const incomingIds = new Set(monitors.map(m => m.id));
+
+  // Remove cards that are gone
+  existingIds.forEach(id => {
+    if (!incomingIds.has(id)) {
+      const el = document.getElementById(`mc-${id}`);
+      if (el) el.remove();
+    }
+  });
+
+  monitors.forEach((m, i) => {
+    const existing = document.getElementById(`mc-${m.id}`);
+    const html = buildMonitorCard(m);
+    if (existing) {
+      existing.outerHTML = html;
+    } else {
+      list.insertAdjacentHTML("beforeend", html);
+    }
+  });
+}
+
+function buildMonitorCard(m) {
+  const isDone = m.status !== "watching";
+  const dotClass = {
+    watching: "dot-watching",
+    found:    "dot-found",
+    expired:  "dot-expired",
+    cancelled:"dot-cancelled",
+  }[m.status] || "dot-cancelled";
+
+  const statusClass = `status-${m.status}`;
+  const statusLabel = {
+    watching: "Watching",
+    found:    "Found: " + (m.status_detail || ""),
+    expired:  m.status_detail || "Timed out",
+    cancelled:"Cancelled",
+  }[m.status] || m.status;
+
+  const lastCheck = m.last_check ? `Last checked ${m.last_check}` : "Starting first check...";
+  const stopStr   = m.stop_date ? ` · Stops ${fmtDateDisplay(m.stop_date)}` : "";
+  const timeWindow = `${fmt12(m.earliest)} - ${fmt12(m.latest)}`;
+
+  const dismissBtn = isDone
+    ? `<button class="monitor-dismiss" title="Dismiss" onclick="dismissMonitor('${m.id}')">&#x2715;</button>`
+    : `<button class="monitor-dismiss" title="Stop monitoring" onclick="stopMonitor('${m.id}')">&#x2715;</button>`;
+
+  return `
+    <div class="monitor-card" id="mc-${m.id}" data-id="${m.id}" data-done="${isDone}">
+      <div class="status-dot ${dotClass}"></div>
+      <div class="monitor-body">
+        <div class="monitor-name">${escHtml(m.name)}</div>
+        <div class="monitor-meta">
+          ${fmtDateDisplay(m.date)} &middot; party of ${m.party_size} &middot; ${timeWindow}${stopStr}
+        </div>
+        <div class="monitor-status ${statusClass}">${escHtml(statusLabel)}</div>
+        <div class="monitor-meta" style="margin-top:3px;">${lastCheck}</div>
+      </div>
+      ${dismissBtn}
+    </div>`;
+}
+
+// ── UI helpers ─────────────────────────────────────────────────────────────────
+function show(id) { document.getElementById(id).classList.add("visible"); }
+function hide(id) { document.getElementById(id).classList.remove("visible"); }
+
+function showError(id, msg) {
+  const el = document.getElementById(id);
+  el.textContent = msg;
+  el.style.display = "block";
+}
+
+function setBusy(busy) {
+  const btn = document.getElementById("start-btn");
+  const spinner = document.getElementById("start-spinner");
+  const label = document.getElementById("start-label");
+  btn.disabled = busy;
+  spinner.classList.toggle("visible", busy);
+  label.textContent = busy ? "Starting..." : "Start Monitoring";
+}
+
+function escHtml(s) {
+  return String(s)
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+function fmt12(hhmm) {
+  if (!hhmm) return "";
+  const [hh, mm] = hhmm.split(":").map(Number);
+  const period = hh < 12 ? "AM" : "PM";
+  const h12 = hh % 12 || 12;
+  return `${h12}:${String(mm).padStart(2,"0")} ${period}`;
+}
+
+function fmtDateDisplay(dateStr) {
+  // "2026-04-10" → "Apr 10"
+  const [y, mo, d] = dateStr.split("-").map(Number);
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  return `${months[mo-1]} ${d}`;
+}
+</script>
+</body>
+</html>
