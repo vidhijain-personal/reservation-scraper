@@ -27,11 +27,11 @@ import requests
 # Credentials are loaded from config.py (gitignored).
 # Copy config.example.py → config.py and fill in your values before running.
 try:
-    from config import GMAIL_FROM, GMAIL_PASSWORD, SMS_TO
+    from config import GMAIL_FROM, GMAIL_PASSWORD
 except ImportError:
-    # config.py is gitignored; credentials come from Streamlit secrets when
-    # used via app.py, or from env vars. CLI users need to create config.py.
-    GMAIL_FROM = GMAIL_PASSWORD = SMS_TO = ""
+    # config.py is gitignored; credentials come from env vars in production.
+    # CLI users need to create config.py (see config.example.py).
+    GMAIL_FROM = GMAIL_PASSWORD = ""
 
 logging.basicConfig(
     level=logging.INFO,
@@ -408,11 +408,13 @@ def _collect_restaurants() -> tuple:
     print("\n─── Monitoring settings ────────────────────────────────────")
     interval_mins = _ask_int("Check every N minutes", 5)
     stop_date     = _ask_stop_date()
+    phone_raw     = _ask("Phone number (10 digits, T-Mobile)")
+    sms_to        = f"{phone_raw.strip()}@tmomail.net"
 
-    return restaurants, interval_mins, stop_date
+    return restaurants, interval_mins, stop_date, sms_to
 
 
-def _print_summary(restaurants: list, interval_mins: int, stop_date: date) -> None:
+def _print_summary(restaurants: list, interval_mins: int, stop_date: date, sms_to: str) -> None:
     """Print a formatted confirmation summary of everything that will be monitored."""
     col = 62
     print("\n" + "=" * col)
@@ -430,7 +432,7 @@ def _print_summary(restaurants: list, interval_mins: int, stop_date: date) -> No
     print("  " + "─" * (col - 2))
     print(f"  Check interval : every {interval_mins} minute(s)")
     print(f"  Auto-stop after: {stop_date.strftime('%m/%d/%y')}")
-    print(f"  SMS recipient  : {SMS_TO}")
+    print(f"  SMS recipient  : {sms_to}")
     print("=" * col)
 
 
@@ -443,10 +445,11 @@ def prompt_setup() -> tuple:
         restaurants  — list of restaurant dicts
         interval     — check interval in seconds
         stop_date    — date object after which monitoring halts
+        sms_to       — SMS gateway address (phone@tmomail.net)
     """
     while True:
-        restaurants, interval_mins, stop_date = _collect_restaurants()
-        _print_summary(restaurants, interval_mins, stop_date)
+        restaurants, interval_mins, stop_date, sms_to = _collect_restaurants()
+        _print_summary(restaurants, interval_mins, stop_date, sms_to)
 
         confirm = _ask("\nEverything look right? Start monitoring? (yes / no)", "yes").lower()
         if confirm in ("yes", "y"):
@@ -457,7 +460,7 @@ def prompt_setup() -> tuple:
         "\nMonitoring started. Type  'stop <id>'  to remove a restaurant.\n"
         "Press Ctrl-C to quit entirely.\n"
     )
-    return restaurants, interval_mins * 60, stop_date
+    return restaurants, interval_mins * 60, stop_date, sms_to
 
 
 # ── Alert ─────────────────────────────────────────────────────────────────────
@@ -482,14 +485,14 @@ def _restaurant_url(restaurant: dict) -> str:
     return "https://resy.com"
 
 
-def send_alert(restaurant: dict, slots: list) -> None:
+def send_alert(restaurant: dict, slots: list, sms_to: str) -> None:
     """Send an SMS alert via Gmail SMTP → T-Mobile email gateway."""
     times_12h = ", ".join(_fmt_time(t) for t in slots)
     url = _restaurant_url(restaurant)
     body = (
         f"Reservation Alert: {restaurant['name']} - "
         f"A table for {restaurant['party_size']} is available on {_fmt_date(restaurant['date'])} - "
-        f"grab it before it's gone!\n\n"
+        f"grab it before its gone!\n\n"
         f"Available times: {times_12h}\n\n"
         f"Book now: {url}\n\n"
         f"Thanks for using Vidhi's reservation scraper!"
@@ -497,12 +500,12 @@ def send_alert(restaurant: dict, slots: list) -> None:
     msg = MIMEText(body, "plain", "utf-8")
     msg["Subject"] = f"Reservation Alert: {restaurant['name']}"
     msg["From"]    = GMAIL_FROM
-    msg["To"]      = SMS_TO
+    msg["To"]      = sms_to
 
     try:
         with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
             smtp.login(GMAIL_FROM, GMAIL_PASSWORD)
-            smtp.sendmail(GMAIL_FROM, SMS_TO, msg.as_string())
+            smtp.sendmail(GMAIL_FROM, sms_to, msg.as_string())
         log.info("SMS sent  — [%d] %s on %s: %s", restaurant["id"], restaurant["name"], restaurant["date"], times_12h)
     except smtplib.SMTPAuthenticationError:
         log.error(
@@ -613,7 +616,7 @@ def check_opentable(restaurant: dict) -> list:
 
 # ── Poll loop ─────────────────────────────────────────────────────────────────
 
-def run_checks(restaurants: list) -> None:
+def run_checks(restaurants: list, sms_to: str) -> None:
     """Run one check cycle across all active restaurants."""
     for restaurant in restaurants:
         platform = restaurant["platform"]
@@ -632,7 +635,7 @@ def run_checks(restaurants: list) -> None:
         new_slots = [t for t in slots if (rid, restaurant["date"], t) not in _alerted]
 
         if new_slots:
-            send_alert(restaurant, new_slots)
+            send_alert(restaurant, new_slots, sms_to)
             for t in new_slots:
                 _alerted.add((rid, restaurant["date"], t))
             # Prompt the user (non-blocking) to optionally stop this restaurant.
@@ -725,7 +728,7 @@ def _process_commands(restaurants: list) -> list:
 
 def main() -> None:
     session_start = datetime.now()
-    restaurants, interval, stop_date = prompt_setup()
+    restaurants, interval, stop_date, sms_to = prompt_setup()
 
     # Set up file logging — every log.info/warning/error goes to this file too.
     log_path = _setup_file_logging(session_start)
@@ -736,7 +739,7 @@ def main() -> None:
     log.info("Session started at %s", session_start.strftime("%Y-%m-%d %H:%M:%S"))
     log.info("Check interval : %ds", interval)
     log.info("Auto-stop after: %s", stop_date.strftime("%m/%d/%y"))
-    log.info("SMS recipient  : %s", SMS_TO)
+    log.info("SMS recipient  : %s", sms_to)
     for r in restaurants:
         pid = r["venue_id"] if r["platform"] == "resy" else r["rid"]
         log.info(
@@ -769,7 +772,7 @@ def main() -> None:
                 log.info("No restaurants left to monitor. Exiting.")
                 break
 
-            run_checks(restaurants)
+            run_checks(restaurants, sms_to)
 
             log.info("Sleeping %ds…", interval)
             # Sleep in short increments so commands are processed promptly.

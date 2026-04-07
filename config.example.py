@@ -9,6 +9,5 @@
 GMAIL_FROM     = "you@gmail.com"
 GMAIL_PASSWORD = "xxxx xxxx xxxx xxxx"   # 16-character App Password
 
-# T-Mobile email-to-SMS gateway: <10-digit number>@tmomail.net
-# Other carriers: AT&T → @txt.att.net  |  Verizon → @vtext.com
-SMS_TO = "2125551234@tmomail.net"
+# The recipient phone number is entered per-request in the web UI (or prompted
+# interactively by the CLI). It is no longer a config-level constant.
